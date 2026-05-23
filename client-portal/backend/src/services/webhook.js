@@ -45,7 +45,7 @@ function sendLoginEventWebhook({
         email,
         companyId: process.env.TENANT_ID,
         eventType,
-        timestamp: new Date().toISOString(),
+        timestamp: (deviceFingerprint && deviceFingerprint.mockTimestamp) || new Date().toISOString(),
         ipAddress: checkIp,
         userAgent: userAgent || 'Unknown',
         deviceFingerprint: {

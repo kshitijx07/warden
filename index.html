@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🔒 Employee Management & Anomaly Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="hero">
+    <h1>Shield Warden</h1>
+    <p class="subtitle">Dynamic Access Controls & Anomalous System Time Detection</p>
+    <div class="clock-card">
+      <span class="clock-label">Simulated System Time:</span>
+      <span id="simulatedTime" class="clock-value">--:--:--</span>
+    </div>
+  </header>
+
+  <section class="controls-panel">
+    <div class="control-group">
+      <label for="roleSelect">👤 Current Role:</label>
+      <select id="roleSelect">
+        <option value="superadmin">Superadmin (All Companies)</option>
+        <option value="companyadmin" selected>Company Admin (Acme Corp)</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label for="companyFilter" id="companyFilterLabel">🏢 Filter Company:</label>
+      <select id="companyFilter">
+        <option value="all">All Companies</option>
+        <option value="Acme Corp">Acme Corp</option>
+        <option value="Beta Tech">Beta Tech</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label for="offsetInput">🕒 Time Offset (minutes):</label>
+      <div class="input-with-button">
+        <input type="number" id="offsetInput" value="0" placeholder="e.g. 120" />
+        <button id="applyOffsetBtn" class="btn-primary">Apply Offset</button>
+      </div>
+    </div>
+  </section>
+
+  <main class="dashboard-content">
+    <div class="table-container">
+      <table class="employee-table" id="employeeTable">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Company</th>
+            <th>Allowed Hours (IST)</th>
+            <th>Status</th>
+            <th>Active Session</th>
+            <th>Risk Score</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="employeeTableBody"></tbody>
+      </table>
+      <div id="noData" class="no-data hidden">No employees found.</div>
+    </div>
+  </main>
+
+  <!-- Edit Allowed Hours Modal -->
+  <div id="editHoursModal" class="modal hidden">
+    <div class="modal-content">
+      <span class="close-btn" id="closeModalBtn">&times;</span>
+      <h3>Edit Allowed Login Hours</h3>
+      <p id="modalEmployeeName" style="color: #a0c4ff; margin-bottom: 1.5rem;"></p>
+      
+      <div class="form-group">
+        <label for="allowedStartInput">Allowed Start Time:</label>
+        <input type="time" id="allowedStartInput" required />
+      </div>
+
+      <div class="form-group">
+        <label for="allowedEndInput">Allowed End Time:</label>
+        <input type="time" id="allowedEndInput" required />
+      </div>
+
+      <div class="modal-actions">
+        <button id="saveHoursBtn" class="btn-primary">Save Changes</button>
+        <button id="cancelHoursBtn" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Powered by Shield Warden IA. <button id="resetBtn" class="btn-link">Reset Database</button></p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -679,6 +679,22 @@ function EmployeesDirectoryView({ token, role, companies, onOpenTimeline }) {
     }
   });
 
+  // Mutation: Update Hours
+  const updateHoursMutation = useMutation({
+    mutationFn: async ({ id, companyId, startHour, endHour }) => {
+      await axios.post(`${API_URL}/admin/employees/${id}/hours`, { startHour, endHour, companyId }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Allowed login hours updated successfully!");
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.error || 'Failed to update allowed login hours');
+    }
+  });
+
   const getSessionDuration = (startedAt, lastActive) => {
     if (!startedAt) return 'N/A';
     const start = new Date(startedAt);
@@ -834,6 +850,7 @@ function EmployeesDirectoryView({ token, role, companies, onOpenTimeline }) {
                   {role === 'superadmin' && <th className="p-3.5 rounded-l-xl">Company</th>}
                   <th className={`p-3.5 ${role !== 'superadmin' ? 'rounded-l-xl' : ''}`}>Employee ID</th>
                   <th className="p-3.5">Email Address</th>
+                  <th className="p-3.5">Allowed Hours (IST)</th>
                   <th className="p-3.5">Account Status</th>
                   <th className="p-3.5">Session Status</th>
                   <th className="p-3.5">Session Time</th>
@@ -852,6 +869,10 @@ function EmployeesDirectoryView({ token, role, companies, onOpenTimeline }) {
                       )}
                       <td className="p-3.5 font-mono text-slate">#{emp.external_employee_id}</td>
                       <td className="p-3.5 font-bold text-charcoal">{emp.email}</td>
+                      
+                      <td className="p-3.5 font-semibold text-charcoal">
+                        {emp.allowed_start_hour.toString().padStart(2, '0')}:00 - {emp.allowed_end_hour.toString().padStart(2, '0')}:00
+                      </td>
                       
                       <td className="p-3.5">
                         {isLocked ? (
@@ -907,6 +928,26 @@ function EmployeesDirectoryView({ token, role, companies, onOpenTimeline }) {
                       </td>
 
                       <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
+                        {(role === 'superadmin' || role === 'companyadmin') && (
+                          <button
+                            onClick={() => {
+                              const start = prompt("Enter Allowed Start Hour (0-23) in IST:", emp.allowed_start_hour);
+                              if (start === null) return;
+                              const end = prompt("Enter Allowed End Hour (0-23) in IST:", emp.allowed_end_hour);
+                              if (end === null) return;
+                              const startHour = parseInt(start, 10);
+                              const endHour = parseInt(end, 10);
+                              if (isNaN(startHour) || isNaN(endHour) || startHour < 0 || startHour > 23 || endHour < 0 || endHour > 23) {
+                                alert("Invalid hours. Please enter numbers between 0 and 23.");
+                                return;
+                              }
+                              updateHoursMutation.mutate({ id: emp.external_employee_id, companyId: emp.company_id, startHour, endHour });
+                            }}
+                            className="px-2.5 py-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-1 shadow-sm hover:shadow"
+                          >
+                            <Clock className="w-3 h-3" /> Set Allowed Hours
+                          </button>
+                        )}
                         {isLocked ? (
                           <button
                             onClick={() => {

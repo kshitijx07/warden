@@ -660,6 +660,8 @@ router.get('/employees', requireAuth, restrictToTenant, async (req, res) => {
         e.email, 
         e.is_locked, 
         e.lock_until,
+        COALESCE(bb.avg_login_hour_start, 8) AS allowed_start_hour,
+        COALESCE(bb.avg_login_hour_end, 17) AS allowed_end_hour,
         le.timestamp AS last_login_time,
         le.ip_address AS last_login_ip,
         le.city AS last_login_city,
@@ -670,6 +672,7 @@ router.get('/employees', requireAuth, restrictToTenant, async (req, res) => {
         aes.last_active AS session_last_active
       FROM employees e
       JOIN companies c ON e.company_id = c.id
+      LEFT JOIN behavior_baselines bb ON bb.company_id = e.company_id AND bb.employee_id = e.external_employee_id
       LEFT JOIN LATERAL (
         SELECT timestamp, ip_address, city, country, risk_score 
         FROM login_events 
@@ -699,6 +702,66 @@ router.get('/employees', requireAuth, restrictToTenant, async (req, res) => {
   } catch (error) {
     console.error('All employees query error:', error);
     return res.status(500).json({ error: 'Failed to retrieve employees directory' });
+  }
+});
+
+// =========================================================================
+// SHARED: Update Allowed Login Hours (Scoped)
+// =========================================================================
+router.post('/employees/:id/hours', requireAuth, restrictToTenant, async (req, res) => {
+  const { id } = req.params; // External Employee ID
+  const { startHour, endHour } = req.body; // integer hours (0-23)
+  const companyId = req.tenantId;
+
+  if (startHour === undefined || endHour === undefined) {
+    return res.status(400).json({ error: 'startHour and endHour are required' });
+  }
+
+  try {
+    // Verify employee exists
+    const empRes = await db.query(
+      'SELECT id FROM employees WHERE company_id = $1 AND external_employee_id = $2',
+      [companyId, id]
+    );
+    if (empRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    // Check if baseline exists
+    const baseRes = await db.query(
+      'SELECT id FROM behavior_baselines WHERE company_id = $1 AND employee_id = $2',
+      [companyId, id]
+    );
+
+    if (baseRes.rows.length === 0) {
+      await db.query(
+        `INSERT INTO behavior_baselines (company_id, employee_id, avg_login_hour_start, avg_login_hour_end) 
+         VALUES ($1, $2, $3, $4)`,
+        [companyId, id, startHour, endHour]
+      );
+    } else {
+      await db.query(
+        `UPDATE behavior_baselines 
+         SET avg_login_hour_start = $1, avg_login_hour_end = $2 
+         WHERE company_id = $3 AND employee_id = $4`,
+        [startHour, endHour, companyId, id]
+      );
+    }
+
+    // Log Immutable Audit Log
+    await logAdminAction({
+      companyId,
+      adminId: req.admin.adminId,
+      action: 'update_allowed_hours',
+      targetType: 'employee',
+      targetId: id.toString(),
+      metadata: { startHour, endHour },
+    });
+
+    return res.status(200).json({ success: true, message: 'Allowed hours updated successfully' });
+  } catch (error) {
+    console.error('Update allowed hours error:', error);
+    return res.status(500).json({ error: 'Failed to update allowed hours' });
   }
 });
 

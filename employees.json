@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "name": "Arjun Mehta",
+    "company": "Acme Corp",
+    "status": "active",
+    "allowedStart": "08:00",
+    "allowedEnd": "17:00",
+    "riskScore": 0,
+    "session": null
+  },
+  {
+    "id": 2,
+    "name": "Priya Sharma",
+    "company": "Acme Corp",
+    "status": "active",
+    "allowedStart": "08:00",
+    "allowedEnd": "17:00",
+    "riskScore": 0,
+    "session": null
+  },
+  {
+    "id": 3,
+    "name": "Rohan Das",
+    "company": "Beta Tech",
+    "status": "active",
+    "allowedStart": "08:00",
+    "allowedEnd": "17:00",
+    "riskScore": 0,
+    "session": null
+  },
+  {
+    "id": 4,
+    "name": "Ananya Iyer",
+    "company": "Beta Tech",
+    "status": "locked",
+    "allowedStart": "08:00",
+    "allowedEnd": "17:00",
+    "riskScore": 85,
+    "session": null
+  }
+]

@@ -163,28 +163,32 @@ async function evaluateSecurityRules(payload) {
   }
 
   // ==========================================
-  // Rule 2: Time-of-Day Analysis
+  // Rule 2: Time-of-Day Analysis (Evaluated in IST - India Standard Time)
   // ==========================================
-  const startHour = baseline ? baseline.avg_login_hour_start : 8;
-  const endHour = baseline ? baseline.avg_login_hour_end : 18;
+  // Convert event timestamp to IST (UTC + 5:30)
+  const istDate = new Date(parsedTime.getTime() + (5.5 * 60 * 60 * 1000));
+  const istHour = istDate.getUTCHours();
+  
+  const startHour = baseline ? baseline.avg_login_hour_start : 8; // Default 8 AM
+  const endHour = baseline ? baseline.avg_login_hour_end : 17;   // Default 5 PM (17:00)
 
   let outsideHours = false;
   if (startHour <= endHour) {
-    outsideHours = eventHour < startHour || eventHour > endHour;
+    outsideHours = istHour < startHour || istHour > endHour;
   } else {
     // Night shift wrapping around midnight
-    outsideHours = eventHour < startHour && eventHour > endHour;
+    outsideHours = istHour < startHour && istHour > endHour;
   }
 
   if (outsideHours) {
     const weightTimeOfDay = getSetting('weight_time_of_day', 15);
     totalScore += weightTimeOfDay;
     breakdown.time_of_day.score = weightTimeOfDay;
-    breakdown.time_of_day.details = `Login hour ${eventHour}:00 UTC falls outside normal window (${startHour}:00 - ${endHour}:00 UTC).`;
+    breakdown.time_of_day.details = `Login hour ${istHour}:00 IST falls outside normal window (${startHour}:00 - ${endHour}:00 IST).`;
     const eventTypeLabel = eventType === 'success' ? 'Successful login' : 'Failed login attempt';
     alertsToRaise.push({
       severity: 'medium',
-      reason: `Suspicious: ${eventTypeLabel} occurred outside normal hours (hour: ${eventHour}:00 UTC).`,
+      reason: `Suspicious: ${eventTypeLabel} occurred outside normal hours (hour: ${istHour}:00 IST). Allowed: ${startHour}:00 - ${endHour}:00 IST.`,
     });
   }
 
