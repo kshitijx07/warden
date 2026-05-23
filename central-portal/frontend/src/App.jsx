@@ -871,7 +871,7 @@ function EmployeesDirectoryView({ token, role, companies, onOpenTimeline }) {
                       <td className="p-3.5 font-bold text-charcoal">{emp.email}</td>
                       
                       <td className="p-3.5 font-semibold text-charcoal">
-                        {emp.allowed_start_hour.toString().padStart(2, '0')}:00 - {emp.allowed_end_hour.toString().padStart(2, '0')}:00
+                        {(emp.allowed_start_hour !== undefined && emp.allowed_start_hour !== null ? emp.allowed_start_hour : 8).toString().padStart(2, '0')}:00 - {(emp.allowed_end_hour !== undefined && emp.allowed_end_hour !== null ? emp.allowed_end_hour : 17).toString().padStart(2, '0')}:00
                       </td>
                       
                       <td className="p-3.5">
@@ -931,9 +931,9 @@ function EmployeesDirectoryView({ token, role, companies, onOpenTimeline }) {
                         {(role === 'superadmin' || role === 'companyadmin') && (
                           <button
                             onClick={() => {
-                              const start = prompt("Enter Allowed Start Hour (0-23) in IST:", emp.allowed_start_hour);
+                              const start = prompt("Enter Allowed Start Hour (0-23) in IST:", emp.allowed_start_hour !== undefined && emp.allowed_start_hour !== null ? emp.allowed_start_hour : 8);
                               if (start === null) return;
-                              const end = prompt("Enter Allowed End Hour (0-23) in IST:", emp.allowed_end_hour);
+                              const end = prompt("Enter Allowed End Hour (0-23) in IST:", emp.allowed_end_hour !== undefined && emp.allowed_end_hour !== null ? emp.allowed_end_hour : 17);
                               if (end === null) return;
                               const startHour = parseInt(start, 10);
                               const endHour = parseInt(end, 10);
