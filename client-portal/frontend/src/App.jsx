@@ -17,7 +17,7 @@ function App() {
 
   // Simulation controls (to help test Geolocation / Impossible Travel)
   const [mockIp, setMockIp] = useState('127.0.0.1');
-  const [mockTimeOffset, setMockTimeOffset] = useState(0);
+  const [mockTimeHour, setMockTimeHour] = useState(-1);
 
   // UI state
   const [currentPage, setCurrentPage] = useState('login'); // login, otp, locked, dashboard
@@ -128,12 +128,19 @@ function App() {
       setCaptchaError('');
     }
 
-    const now = new Date();
-    const mockTime = new Date(now.getTime() + mockTimeOffset * 60 * 1000);
+    let mockTimestamp = new Date().toISOString();
+    if (mockTimeHour !== -1) {
+      const now = new Date();
+      const istOffsetMs = 5.5 * 60 * 60 * 1000;
+      const currentIst = new Date(now.getTime() + istOffsetMs);
+      currentIst.setUTCHours(mockTimeHour, 0, 0, 0);
+      const mockUtcDate = new Date(currentIst.getTime() - istOffsetMs);
+      mockTimestamp = mockUtcDate.toISOString();
+    }
     const deviceFingerprint = {
       ...getDeviceFingerprint(),
       mockIp, // Attach user-selected mock IP to test geolocation rules
-      mockTimestamp: mockTime.toISOString(),
+      mockTimestamp,
     };
 
     try {
@@ -384,15 +391,15 @@ function App() {
                 <div className="mt-2 border-t border-[#E8F4FD] pt-2.5">
                   <label className="block text-[10px] font-bold text-slate uppercase tracking-wider mb-1">Test System Time Simulator (Time Override)</label>
                   <select
-                    value={mockTimeOffset}
-                    onChange={(e) => setMockTimeOffset(Number(e.target.value))}
+                    value={mockTimeHour}
+                    onChange={(e) => setMockTimeHour(Number(e.target.value))}
                     className="w-full text-xs bg-white border border-gray-200 rounded p-1.5 text-charcoal font-medium focus:outline-none focus:border-[#0A4D8C] focus:ring-3 focus:ring-[#0A4D8C]/12"
                   >
-                    <option value="0">Current System Time (Local)</option>
-                    <option value="-330">Simulate Midnight (12:00 AM IST)</option>
-                    <option value="-150">Simulate 3 AM Night IST</option>
-                    <option value="120">Add 2 Hours (+120 min)</option>
-                    <option value="-240">Subtract 4 Hours (-240 min)</option>
+                    <option value="-1">Current System Time (Local)</option>
+                    <option value="0">Simulate Midnight (12:00 AM IST)</option>
+                    <option value="3">Simulate 3:00 AM Night IST (Anomaly)</option>
+                    <option value="10">Simulate 10:00 AM Morning IST (Normal)</option>
+                    <option value="22">Simulate 10:00 PM Night IST (Anomaly)</option>
                   </select>
                   <span className="text-[9px] text-slate mt-1 block leading-normal">
                     Simulates different hours to trigger anomalous timing detections.

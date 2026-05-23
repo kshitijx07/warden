@@ -717,11 +717,16 @@ router.post('/employees/:id/hours', requireAuth, restrictToTenant, async (req, r
     return res.status(400).json({ error: 'startHour and endHour are required' });
   }
 
+  const externalEmployeeId = parseInt(id, 10);
+  if (isNaN(externalEmployeeId)) {
+    return res.status(400).json({ error: 'Invalid employee ID' });
+  }
+
   try {
     // Verify employee exists
     const empRes = await db.query(
       'SELECT id FROM employees WHERE company_id = $1 AND external_employee_id = $2',
-      [companyId, id]
+      [companyId, externalEmployeeId]
     );
     if (empRes.rows.length === 0) {
       return res.status(404).json({ error: 'Employee not found' });
@@ -730,21 +735,21 @@ router.post('/employees/:id/hours', requireAuth, restrictToTenant, async (req, r
     // Check if baseline exists
     const baseRes = await db.query(
       'SELECT id FROM behavior_baselines WHERE company_id = $1 AND employee_id = $2',
-      [companyId, id]
+      [companyId, externalEmployeeId]
     );
 
     if (baseRes.rows.length === 0) {
       await db.query(
         `INSERT INTO behavior_baselines (company_id, employee_id, avg_login_hour_start, avg_login_hour_end) 
          VALUES ($1, $2, $3, $4)`,
-        [companyId, id, startHour, endHour]
+        [companyId, externalEmployeeId, startHour, endHour]
       );
     } else {
       await db.query(
         `UPDATE behavior_baselines 
          SET avg_login_hour_start = $1, avg_login_hour_end = $2 
          WHERE company_id = $3 AND employee_id = $4`,
-        [startHour, endHour, companyId, id]
+        [startHour, endHour, companyId, externalEmployeeId]
       );
     }
 
