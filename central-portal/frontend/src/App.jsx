@@ -637,6 +637,326 @@ function LockedEmployeesView({ token, role, companies }) {
   );
 }
 
+function EmployeesDirectoryView({ token, role, companies, onOpenTimeline }) {
+  const queryClient = useQueryClient();
+  const { admin } = useAuthStore();
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all, active, locked
+  const [sessionFilter, setSessionFilter] = useState('all'); // all, active, inactive
+  const [sortBy, setSortBy] = useState('email'); // email, id, risk_score, last_login
+
+  // Fetch employees query
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['employees', companyFilter],
+    queryFn: async () => {
+      const url = companyFilter 
+        ? `${API_URL}/admin/employees?companyId=${companyFilter}`
+        : `${API_URL}/admin/employees`;
+      const res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.data;
+    },
+    refetchInterval: 5000,
+  });
+
+  // Mutation: Lock/Unlock Employee
+  const lockMutation = useMutation({
+    mutationFn: async ({ id, companyId, lock }) => {
+      await axios.post(`${API_URL}/admin/employees/${id}/lock-action`, { lock, companyId }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+    onSuccess: (_, variables) => {
+      toast.success(`Account successfully ${variables.lock ? 'locked' : 'unlocked'}`);
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['lockedEmployees'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.error || 'Failed to update employee lock status');
+    }
+  });
+
+  const getSessionDuration = (startedAt, lastActive) => {
+    if (!startedAt) return 'N/A';
+    const start = new Date(startedAt);
+    const end = lastActive ? new Date(lastActive) : new Date();
+    const diffMs = end - start;
+    if (diffMs < 0) return '0s';
+    const diffSecs = Math.floor(diffMs / 1000);
+    const mins = Math.floor(diffSecs / 60);
+    const hours = Math.floor(mins / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${mins % 60}m`;
+    }
+    if (mins > 0) {
+      return `${mins}m ${diffSecs % 60}s`;
+    }
+    return `${diffSecs}s`;
+  };
+
+  const getRiskScoreBadge = (score) => {
+    if (score === null || score === undefined) return <span className="text-slate font-mono">-</span>;
+    let colorClass = 'badge-glass-low';
+    if (score >= 80) colorClass = 'badge-glass-critical';
+    else if (score >= 50) colorClass = 'badge-glass-warning';
+    else if (score >= 20) colorClass = 'badge-glass-medium';
+    
+    return (
+      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${colorClass}`}>
+        {score}
+      </span>
+    );
+  };
+
+  let filtered = data?.employees || [];
+
+  filtered = filtered.filter(emp => {
+    const matchesSearch = searchQuery === '' || 
+      emp.email.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      emp.external_employee_id.toString().includes(searchQuery);
+    
+    const isLocked = emp.is_locked && (!emp.lock_until || new Date(emp.lock_until) > new Date());
+    const matchesStatus = statusFilter === 'all' ||
+      (statusFilter === 'locked' && isLocked) ||
+      (statusFilter === 'active' && !isLocked);
+
+    const matchesSession = sessionFilter === 'all' ||
+      (sessionFilter === 'active' && emp.is_session_active) ||
+      (sessionFilter === 'inactive' && !emp.is_session_active);
+
+    return matchesSearch && matchesStatus && matchesSession;
+  });
+
+  filtered = [...filtered].sort((a, b) => {
+    if (sortBy === 'email') return a.email.localeCompare(b.email);
+    if (sortBy === 'id') return a.external_employee_id - b.external_employee_id;
+    if (sortBy === 'risk_score') return (b.last_risk_score || 0) - (a.last_risk_score || 0);
+    if (sortBy === 'last_login') {
+      const aTime = a.last_login_time ? new Date(a.last_login_time).getTime() : 0;
+      const bTime = b.last_login_time ? new Date(b.last_login_time).getTime() : 0;
+      return bTime - aTime;
+    }
+    return 0;
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="card-warden p-6">
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-base font-bold font-display text-charcoal">Employee Directory</h2>
+              <p className="text-xs text-slate">View employee registries, session indicators, security telemetry, and toggle lock override controls.</p>
+            </div>
+            
+            <button
+              onClick={() => refetch()}
+              className="p-2 border border-brand-light text-slate hover:text-charcoal hover:bg-slate-50 rounded-xl transition-all self-end md:self-auto"
+              title="Refresh roster"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate" />
+              <input
+                type="text"
+                placeholder="Search email or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-xl text-xs text-charcoal focus:outline-none focus:border-[#0A4D8C] focus:ring-3 focus:ring-[#0A4D8C]/12 transition-all"
+              />
+            </div>
+
+            {role === 'superadmin' ? (
+              <select
+                value={companyFilter}
+                onChange={(e) => setCompanyFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-xl text-xs text-charcoal focus:outline-none focus:border-[#0A4D8C] focus:bg-brand-light transition-all"
+              >
+                <option value="">All Companies</option>
+                {companies?.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="px-3 py-2 border border-gray-100 rounded-xl text-xs text-slate bg-gray-50 flex items-center font-bold">
+                Tenant: {admin?.companyId || 'Local Company'}
+              </div>
+            )}
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-xl text-xs text-charcoal focus:outline-none focus:border-[#0A4D8C] focus:bg-brand-light transition-all"
+            >
+              <option value="all">All Account Statuses</option>
+              <option value="active">Active Accounts</option>
+              <option value="locked">Locked Accounts</option>
+            </select>
+
+            <select
+              value={sessionFilter}
+              onChange={(e) => setSessionFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-xl text-xs text-charcoal focus:outline-none focus:border-[#0A4D8C] focus:bg-brand-light transition-all"
+            >
+              <option value="all">All Session States</option>
+              <option value="active">Active Sessions</option>
+              <option value="inactive">Inactive Sessions</option>
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-xl text-xs text-charcoal focus:outline-none focus:border-[#0A4D8C] focus:bg-brand-light transition-all"
+            >
+              <option value="email">Sort by Email</option>
+              <option value="id">Sort by Employee ID</option>
+              <option value="risk_score">Sort by Risk Score</option>
+              <option value="last_login">Sort by Last Login</option>
+            </select>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <TableSkeleton />
+        ) : filtered.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-brand-light text-brand-dark uppercase tracking-wider font-semibold">
+                  {role === 'superadmin' && <th className="p-3.5 rounded-l-xl">Company</th>}
+                  <th className={`p-3.5 ${role !== 'superadmin' ? 'rounded-l-xl' : ''}`}>Employee ID</th>
+                  <th className="p-3.5">Email Address</th>
+                  <th className="p-3.5">Account Status</th>
+                  <th className="p-3.5">Session Status</th>
+                  <th className="p-3.5">Session Time</th>
+                  <th className="p-3.5">Last Location / IP</th>
+                  <th className="p-3.5">Risk Score</th>
+                  <th className="p-3.5 rounded-r-xl text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brand-light">
+                {filtered.map((emp) => {
+                  const isLocked = emp.is_locked && (!emp.lock_until || new Date(emp.lock_until) > new Date());
+                  return (
+                    <tr key={emp.id} className="hover:bg-brand-bg transition-colors">
+                      {role === 'superadmin' && (
+                        <td className="p-3.5 font-bold text-[#0A4D8C]">{emp.company_name}</td>
+                      )}
+                      <td className="p-3.5 font-mono text-slate">#{emp.external_employee_id}</td>
+                      <td className="p-3.5 font-bold text-charcoal">{emp.email}</td>
+                      
+                      <td className="p-3.5">
+                        {isLocked ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-status-warning border border-amber-100">
+                            <Lock className="w-3 h-3" /> Locked
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-status-success border border-green-100">
+                            <Unlock className="w-3 h-3" /> Active
+                          </span>
+                        )}
+                        {emp.is_locked && emp.lock_until && new Date(emp.lock_until) > new Date() && (
+                          <div className="text-[9px] text-slate mt-1">
+                            Expires: {format(new Date(emp.lock_until), 'HH:mm:ss')}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="p-3.5">
+                        {emp.is_session_active ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F4FD] text-brand-medium border border-[#D0E8F9]">
+                            <span className="pulse-indicator w-2 h-2 mr-1"></span> Active Session
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-50 text-slate border border-gray-200">
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="p-3.5 font-mono text-[10px] text-slate">
+                        {emp.is_session_active ? getSessionDuration(emp.session_started_at, emp.session_last_active) : 'N/A'}
+                      </td>
+
+                      <td className="p-3.5 text-slate font-mono text-[10px]">
+                        {emp.last_login_time ? (
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-charcoal">
+                              {emp.last_login_city || 'Unknown'}, {emp.last_login_country || 'Unknown'}
+                            </div>
+                            <div>{emp.last_login_ip}</div>
+                            <div className="text-[9px] text-slate/70">
+                              {format(new Date(emp.last_login_time), 'yyyy-MM-dd HH:mm:ss')}
+                            </div>
+                          </div>
+                        ) : (
+                          'No logins registered'
+                        )}
+                      </td>
+
+                      <td className="p-3.5">
+                        {getRiskScoreBadge(emp.last_risk_score)}
+                      </td>
+
+                      <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
+                        {isLocked ? (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Unlock account for ${emp.email}?`)) {
+                                lockMutation.mutate({ id: emp.external_employee_id, companyId: emp.company_id, lock: false });
+                              }
+                            }}
+                            className="px-2.5 py-1.5 bg-green-600 text-white text-[10px] font-bold rounded-lg hover:bg-green-700 transition-colors inline-flex items-center gap-1 shadow-sm hover:shadow"
+                          >
+                            <Unlock className="w-3 h-3" /> Unlock
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Manually lock account for ${emp.email}? This will invalidate active sessions.`)) {
+                                lockMutation.mutate({ id: emp.external_employee_id, companyId: emp.company_id, lock: true });
+                              }
+                            }}
+                            className="px-2.5 py-1.5 bg-[#D93025] text-white text-[10px] font-bold rounded-lg hover:bg-red-700 transition-colors inline-flex items-center gap-1 shadow-sm hover:shadow"
+                          >
+                            <Lock className="w-3 h-3" /> Lock Account
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onOpenTimeline(emp.external_employee_id, emp.company_id)}
+                          className="px-2.5 py-1.5 bg-[#E4EBF5] text-charcoal text-[10px] font-bold rounded-lg hover:bg-[#D0DDF0] transition-colors inline-flex items-center gap-1 border border-brand-light"
+                        >
+                          <History className="w-3 h-3" /> Timeline
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
+            <div className="w-[80px] h-[80px] rounded-full bg-blue-50 text-brand-medium flex items-center justify-center border border-blue-100">
+              <Users className="w-10 h-10" />
+            </div>
+            <h3 className="font-display font-semibold text-lg text-charcoal tracking-tight">No Employees Found</h3>
+            <p className="text-sm text-slate max-w-sm">No employees match the selected criteria or search term.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RiskSettingsView({ token }) {
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState({});
@@ -1262,6 +1582,16 @@ function MainApp() {
                   {alerts.filter(a => a.status === 'active').length}
                 </span>
               )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('employees')}
+              className={`w-full py-2.5 px-3.5 rounded-xl flex items-center gap-3 text-sm font-semibold transition-all duration-150 ${
+                activeTab === 'employees' ? 'nav-active-pill shadow-sm' : 'nav-inactive'
+              }`}
+            >
+              <Users className="w-5 h-5" />
+              {!sidebarCollapsed && <span>Employees</span>}
             </button>
 
             <button
@@ -2027,6 +2357,20 @@ function MainApp() {
           {/* Locked Accounts View */}
           {displayTab === 'locked' && (
             <LockedEmployeesView token={token} role={admin?.role} companies={companiesData?.companies} />
+          )}
+
+          {/* Employees Directory View */}
+          {displayTab === 'employees' && (
+            <EmployeesDirectoryView 
+              token={token} 
+              role={admin?.role} 
+              companies={companiesData?.companies} 
+              onOpenTimeline={(employeeId, companyId) => {
+                setSelectedEmployeeId(employeeId);
+                setSelectedEmployeeCompanyId(companyId);
+                setShowTimelineModal(true);
+              }}
+            />
           )}
           </div>
         </main>

@@ -635,4 +635,63 @@ router.get('/employees/locked', requireAuth, restrictToTenant, async (req, res) 
   }
 });
 
+// =========================================================================
+// SHARED: Get All Employees Directory (Scoped)
+// =========================================================================
+router.get('/employees', requireAuth, restrictToTenant, async (req, res) => {
+  const companyId = req.tenantId;
+
+  try {
+    let query = `
+      SELECT 
+        e.id, 
+        e.company_id, 
+        c.name AS company_name, 
+        e.external_employee_id, 
+        e.email, 
+        e.is_locked, 
+        e.lock_until,
+        le.timestamp AS last_login_time,
+        le.ip_address AS last_login_ip,
+        le.city AS last_login_city,
+        le.country AS last_login_country,
+        le.risk_score AS last_risk_score,
+        aes.is_active AS is_session_active,
+        aes.started_at AS session_started_at,
+        aes.last_active AS session_last_active
+      FROM employees e
+      JOIN companies c ON e.company_id = c.id
+      LEFT JOIN LATERAL (
+        SELECT timestamp, ip_address, city, country, risk_score 
+        FROM login_events 
+        WHERE company_id = e.company_id AND employee_id = e.external_employee_id
+        ORDER BY timestamp DESC 
+        LIMIT 1
+      ) le ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT is_active, started_at, last_active 
+        FROM active_employee_sessions 
+        WHERE company_id = e.company_id AND employee_id = e.external_employee_id AND is_active = true
+        ORDER BY started_at DESC 
+        LIMIT 1
+      ) aes ON TRUE
+    `;
+    const queryParams = [];
+
+    if (companyId) {
+      query += ` WHERE e.company_id = $1`;
+      queryParams.push(companyId);
+    }
+
+    query += ` ORDER BY e.company_id ASC, e.email ASC`;
+
+    const result = await db.query(query, queryParams);
+    return res.status(200).json({ employees: result.rows });
+  } catch (error) {
+    console.error('All employees query error:', error);
+    return res.status(500).json({ error: 'Failed to retrieve employees directory' });
+  }
+});
+
 module.exports = router;
+
