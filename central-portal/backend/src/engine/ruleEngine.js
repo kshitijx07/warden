@@ -66,6 +66,15 @@ async function evaluateSecurityRules(payload) {
     concurrent_session: { score: 0, details: 'No active concurrent sessions' },
   };
 
+  if (eventType === 'logout') {
+    return {
+      totalScore: 0,
+      actionTaken: 'none',
+      breakdown,
+      alerts: [],
+    };
+  }
+
   const alertsToRaise = [];
   const parsedTime = new Date(timestamp);
   const eventHour = parsedTime.getUTCHours();

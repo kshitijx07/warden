@@ -206,7 +206,18 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const currentToken = token || localStorage.getItem('warden_token');
+    try {
+      if (currentToken) {
+        await axios.post(`${API_URL}/auth/logout`, {}, {
+          headers: { Authorization: `Bearer ${currentToken}` },
+          withCredentials: true,
+        });
+      }
+    } catch (err) {
+      console.error('Logout error on server:', err);
+    }
     localStorage.removeItem('warden_token');
     setToken('');
     setUser(null);
@@ -441,19 +452,36 @@ function App() {
           {/* 3. Account Locked Screen */}
           {displayPage === 'locked' && (
             <div className="space-y-6 text-center">
-              <div className="w-16 h-16 bg-red-50 text-status-critical rounded-full flex items-center justify-center mx-auto border border-red-200">
+              <div className="w-16 h-16 bg-red-50 text-status-critical rounded-full flex items-center justify-center mx-auto border border-red-200 animate-pulse">
                 <Lock className="w-8 h-8" />
               </div>
-              <div className="p-4 bg-red-50/50 border border-red-200 rounded-xl">
-                <h2 className="text-sm font-bold text-status-critical mb-1 uppercase tracking-wider">Temporary Lockout</h2>
-                <p className="text-xs text-slate leading-relaxed">
-                  Your account is locked for safety due to excessive failed attempts or suspicious parameters detected by our rule engine.
-                </p>
-              </div>
-              <div className="text-4xl font-bold font-display text-charcoal font-tabular tracking-tight">
-                {formatTime(lockoutRemaining)}
-              </div>
-              <p className="text-[10px] text-slate font-medium">Lock expires in the window above.</p>
+              {lockoutRemaining === -1 || lockoutRemaining === null ? (
+                <>
+                  <div className="p-4 bg-red-50/50 border border-red-200 rounded-xl">
+                    <h2 className="text-sm font-bold text-status-critical mb-1 uppercase tracking-wider">Administrative Lockout</h2>
+                    <p className="text-xs text-slate leading-relaxed">
+                      Your account has been locked by an administrator. Please contact security support for bypass credentials.
+                    </p>
+                  </div>
+                  <div className="text-2xl font-bold font-display text-status-critical tracking-tight">
+                    LOCKED INDEFINITELY
+                  </div>
+                  <p className="text-[10px] text-slate font-medium">Contact security for admin override keys.</p>
+                </>
+              ) : (
+                <>
+                  <div className="p-4 bg-red-50/50 border border-red-200 rounded-xl">
+                    <h2 className="text-sm font-bold text-status-critical mb-1 uppercase tracking-wider">Temporary Lockout</h2>
+                    <p className="text-xs text-slate leading-relaxed">
+                      Your account is locked for safety due to excessive failed attempts or suspicious parameters detected by our rule engine.
+                    </p>
+                  </div>
+                  <div className="text-4xl font-bold font-display text-charcoal font-tabular tracking-tight">
+                    {formatTime(lockoutRemaining)}
+                  </div>
+                  <p className="text-[10px] text-slate font-medium">Lock expires in the window above.</p>
+                </>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}

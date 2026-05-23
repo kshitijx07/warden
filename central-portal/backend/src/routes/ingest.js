@@ -96,83 +96,90 @@ router.post('/ingest', async (req, res) => {
 
     // 6. Process Enrichment & Baselines if employee exists
     if (finalEmployeeId) {
-      // Device fingerprint listing
-      const incomingHash = deviceFingerprint?.fingerprintHash || 'unknown-hash';
-      const devRes = await db.query(
-        'SELECT id FROM device_history WHERE company_id = $1 AND employee_id = $2 AND fingerprint_hash = $3',
-        [companyId, finalEmployeeId, incomingHash]
-      );
-      if (devRes.rows.length === 0) {
-        await db.query(
-          `INSERT INTO device_history (company_id, employee_id, fingerprint_hash) 
-           VALUES ($1, $2, $3)`,
-          [companyId, finalEmployeeId, incomingHash]
-        );
-      } else {
-        await db.query(
-          'UPDATE device_history SET last_seen = NOW() WHERE company_id = $1 AND employee_id = $2 AND fingerprint_hash = $3',
-          [companyId, finalEmployeeId, incomingHash]
-        );
-      }
-
-      // Update baseline last success coordinates if this was a safe success
-      if (eventType === 'success') {
-        await db.query(
-          `UPDATE employees 
-           SET is_locked = false, lock_until = null 
-           WHERE company_id = $1 AND external_employee_id = $2`,
-          [companyId, finalEmployeeId]
-        );
-      }
-
-      if (eventType === 'success' && evaluation.totalScore <= 80) {
-        const lastLat = geolocation?.ll?.[0];
-        const lastLng = geolocation?.ll?.[1];
-
-        // Check if baseline exists
-        const baseRes = await db.query(
-          'SELECT id FROM behavior_baselines WHERE company_id = $1 AND employee_id = $2',
-          [companyId, finalEmployeeId]
-        );
-
-        if (baseRes.rows.length === 0) {
-          await db.query(
-            `INSERT INTO behavior_baselines (company_id, employee_id, last_successful_login_lat, last_successful_login_lng, last_successful_login_time) 
-             VALUES ($1, $2, $3, $4, $5)`,
-            [companyId, finalEmployeeId, lastLat, lastLng, new Date(timestamp)]
-          );
-        } else {
-          await db.query(
-            `UPDATE behavior_baselines 
-             SET last_successful_login_lat = $1, last_successful_login_lng = $2, last_successful_login_time = $3 
-             WHERE company_id = $4 AND employee_id = $5`,
-            [lastLat, lastLng, new Date(timestamp), companyId, finalEmployeeId]
-          );
-        }
-
-        // Upsert active employee session
-        const clientSessionId = deviceFingerprint?.clientSessionId || '00000000-0000-0000-0000-000000000000'; // Default if not passed
-        await db.query(
-          `INSERT INTO active_employee_sessions (company_id, employee_id, client_session_id, ip_address, device_fingerprint_hash, is_active) 
-           VALUES ($1, $2, $3, $4, $5, true)
-           ON CONFLICT DO NOTHING`, // Simple session update
-          [companyId, finalEmployeeId, clientSessionId, ipAddress, incomingHash]
-        );
-      }
-
-      // If lockout or suspension, invalidate active sessions
-      if (evaluation.actionTaken === 'account_locked' || eventType === 'locked') {
+      if (eventType === 'logout') {
         await db.query(
           'UPDATE active_employee_sessions SET is_active = false WHERE company_id = $1 AND employee_id = $2',
           [companyId, finalEmployeeId]
         );
-        const lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes lockout
-        await db.query(
-          `UPDATE employees 
-           SET is_locked = true, lock_until = $1 
-           WHERE company_id = $2 AND external_employee_id = $3`,
-          [lockUntil, companyId, finalEmployeeId]
+      } else {
+        // Device fingerprint listing
+        const incomingHash = deviceFingerprint?.fingerprintHash || 'unknown-hash';
+        const devRes = await db.query(
+          'SELECT id FROM device_history WHERE company_id = $1 AND employee_id = $2 AND fingerprint_hash = $3',
+          [companyId, finalEmployeeId, incomingHash]
         );
+        if (devRes.rows.length === 0) {
+          await db.query(
+            `INSERT INTO device_history (company_id, employee_id, fingerprint_hash) 
+             VALUES ($1, $2, $3)`,
+            [companyId, finalEmployeeId, incomingHash]
+          );
+        } else {
+          await db.query(
+            'UPDATE device_history SET last_seen = NOW() WHERE company_id = $1 AND employee_id = $2 AND fingerprint_hash = $3',
+            [companyId, finalEmployeeId, incomingHash]
+          );
+        }
+
+        // Update baseline last success coordinates if this was a safe success
+        if (eventType === 'success') {
+          await db.query(
+            `UPDATE employees 
+             SET is_locked = false, lock_until = null 
+             WHERE company_id = $1 AND external_employee_id = $2`,
+            [companyId, finalEmployeeId]
+          );
+        }
+
+        if (eventType === 'success' && evaluation.totalScore <= 80) {
+          const lastLat = geolocation?.ll?.[0];
+          const lastLng = geolocation?.ll?.[1];
+
+          // Check if baseline exists
+          const baseRes = await db.query(
+            'SELECT id FROM behavior_baselines WHERE company_id = $1 AND employee_id = $2',
+            [companyId, finalEmployeeId]
+          );
+
+          if (baseRes.rows.length === 0) {
+            await db.query(
+              `INSERT INTO behavior_baselines (company_id, employee_id, last_successful_login_lat, last_successful_login_lng, last_successful_login_time) 
+               VALUES ($1, $2, $3, $4, $5)`,
+              [companyId, finalEmployeeId, lastLat, lastLng, new Date(timestamp)]
+            );
+          } else {
+            await db.query(
+              `UPDATE behavior_baselines 
+               SET last_successful_login_lat = $1, last_successful_login_lng = $2, last_successful_login_time = $3 
+               WHERE company_id = $4 AND employee_id = $5`,
+              [lastLat, lastLng, new Date(timestamp), companyId, finalEmployeeId]
+            );
+          }
+
+          // Upsert active employee session
+          const clientSessionId = deviceFingerprint?.clientSessionId || '00000000-0000-0000-0000-000000000000'; // Default if not passed
+          await db.query(
+            `INSERT INTO active_employee_sessions (company_id, employee_id, client_session_id, ip_address, device_fingerprint_hash, is_active) 
+             VALUES ($1, $2, $3, $4, $5, true)
+             ON CONFLICT DO NOTHING`, // Simple session update
+            [companyId, finalEmployeeId, clientSessionId, ipAddress, incomingHash]
+          );
+        }
+
+        // If lockout or suspension, invalidate active sessions
+        if (evaluation.actionTaken === 'account_locked' || eventType === 'locked') {
+          await db.query(
+            'UPDATE active_employee_sessions SET is_active = false WHERE company_id = $1 AND employee_id = $2',
+            [companyId, finalEmployeeId]
+          );
+          const lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes lockout
+          await db.query(
+            `UPDATE employees 
+             SET is_locked = true, lock_until = $1 
+             WHERE company_id = $2 AND external_employee_id = $3`,
+            [lockUntil, companyId, finalEmployeeId]
+          );
+        }
       }
     }
 

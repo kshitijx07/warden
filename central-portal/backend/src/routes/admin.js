@@ -430,6 +430,7 @@ router.post('/employees/:id/lock-action', requireAuth, restrictToTenant, async (
       email: employeeEmail,
       companyId,
       unlock: !lock, // Toggle lock state
+      permanent: lock, // Manual locks are permanent!
     };
     const rawBody = JSON.stringify(payload);
     const signature = crypto.createHmac('sha256', callbackToken).update(rawBody).digest('hex');
@@ -455,6 +456,14 @@ router.post('/employees/:id/lock-action', requireAuth, restrictToTenant, async (
        WHERE company_id = $2 AND external_employee_id = $3`,
       [lock, companyId, id]
     );
+
+    if (lock) {
+      // Invalidate active session in Central Database
+      await db.query(
+        'UPDATE active_employee_sessions SET is_active = false WHERE company_id = $1 AND employee_id = $2',
+        [companyId, id]
+      );
+    }
 
     // 3. Log Immutable Audit Log
     await logAdminAction({

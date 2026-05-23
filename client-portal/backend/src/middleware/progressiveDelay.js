@@ -38,13 +38,21 @@ async function progressiveDelayMiddleware(req, res, next) {
     const employeeRes = await db.query('SELECT is_locked, lock_until FROM employees WHERE email = $1', [email]);
     if (employeeRes.rows.length > 0) {
       const emp = employeeRes.rows[0];
-      if (emp.is_locked && emp.lock_until && new Date(emp.lock_until) > new Date()) {
-        const remainingSeconds = Math.ceil((new Date(emp.lock_until) - new Date()) / 1000);
-        return res.status(423).json({
-          status: 'locked',
-          message: 'Account is temporarily locked due to excessive failed attempts.',
-          lockoutRemaining: remainingSeconds,
-        });
+      if (emp.is_locked) {
+        const isExpired = emp.lock_until && new Date(emp.lock_until) <= new Date();
+        if (!isExpired) {
+          const remainingSeconds = emp.lock_until 
+            ? Math.ceil((new Date(emp.lock_until) - new Date()) / 1000)
+            : -1; // -1 indicates permanent/indefinite lock
+
+          return res.status(423).json({
+            status: 'locked',
+            message: remainingSeconds === -1 
+              ? 'Account has been locked by an administrator.' 
+              : 'Account is temporarily locked due to excessive failed attempts.',
+            lockoutRemaining: remainingSeconds,
+          });
+        }
       }
     }
   } catch (error) {

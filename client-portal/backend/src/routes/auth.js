@@ -59,13 +59,21 @@ router.post(
       const employee = employeeQuery.rows[0];
 
       // Double-check lockout status (already checked in middleware, but as safety check)
-      if (employee.is_locked && employee.lock_until && new Date(employee.lock_until) > new Date()) {
-        const remainingSeconds = Math.ceil((new Date(employee.lock_until) - new Date()) / 1000);
-        return res.status(423).json({
-          status: 'locked',
-          message: 'Account is temporarily locked due to excessive failed attempts.',
-          lockoutRemaining: remainingSeconds,
-        });
+      if (employee.is_locked) {
+        const isExpired = employee.lock_until && new Date(employee.lock_until) <= new Date();
+        if (!isExpired) {
+          const remainingSeconds = employee.lock_until 
+            ? Math.ceil((new Date(employee.lock_until) - new Date()) / 1000)
+            : -1; // -1 indicates permanent/indefinite lock
+
+          return res.status(423).json({
+            status: 'locked',
+            message: remainingSeconds === -1 
+              ? 'Account has been locked by an administrator.' 
+              : 'Account is temporarily locked due to excessive failed attempts.',
+            lockoutRemaining: remainingSeconds,
+          });
+        }
       }
 
       // Verify password
@@ -303,7 +311,7 @@ router.post('/callback/lock-employee', verifyCallbackSignature, async (req, res)
     return res.status(401).json({ message: 'Unauthorized API Key' });
   }
 
-  const { email, companyId, unlock } = req.body;
+  const { email, companyId, unlock, permanent } = req.body;
   if (companyId !== process.env.TENANT_ID) {
     return res.status(400).json({ message: 'Tenant mismatch' });
   }
@@ -326,7 +334,7 @@ router.post('/callback/lock-employee', verifyCallbackSignature, async (req, res)
 
       return res.status(200).json({ message: 'Employee successfully unlocked' });
     } else {
-      const lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes lock
+      const lockUntil = permanent ? null : new Date(Date.now() + 15 * 60 * 1000); // null for permanent, 15m for temp
 
       const employeeRes = await db.query(
         `UPDATE employees SET is_locked = true, lock_until = $1 
@@ -479,6 +487,64 @@ router.get('/me', async (req, res) => {
     });
   } catch (error) {
     return res.status(401).json({ message: 'Invalid or expired token' });
+  }
+});
+
+// 6. Employee Logout Route
+router.post('/logout', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  let sessionId = null;
+  let email = null;
+  let employeeId = null;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      sessionId = decoded.sessionId;
+      email = decoded.email;
+      employeeId = decoded.employeeId;
+    } catch (err) {
+      // Ignored: token might be expired, but we still invalidate by session or cookie
+    }
+  }
+
+  try {
+    if (sessionId) {
+      // Invalidate session locally in client DB
+      await db.query("UPDATE sessions SET status = 'invalidated' WHERE id = $1", [sessionId]);
+    }
+
+    // Invalidate refresh token if it exists in cookies/body
+    const refreshToken = getCookie(req, 'refresh_token') || req.body.refreshToken;
+    if (refreshToken) {
+      const hashed = hashToken(refreshToken);
+      await db.query("UPDATE sessions SET status = 'invalidated' WHERE refresh_token_hash = $1", [hashed]);
+    }
+
+    // Notify Central monitoring of the logout event
+    if (email) {
+      sendLoginEventWebhook({
+        employeeId,
+        email,
+        eventType: 'logout',
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+        userAgent: req.headers['user-agent'] || 'Unknown',
+        deviceFingerprint: req.body.deviceFingerprint,
+      });
+    }
+
+    // Clear HTTP-only cookie
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: false, // set true in production
+      sameSite: 'strict',
+    });
+
+    return res.status(200).json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout route error:', error);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 });
 
