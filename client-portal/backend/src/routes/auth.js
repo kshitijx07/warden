@@ -456,6 +456,28 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const tokenHash = hashToken(token);
 
+    // 1. Check if employee is locked
+    const employeeQuery = await db.query('SELECT is_locked, lock_until FROM employees WHERE id = $1', [decoded.employeeId]);
+    if (employeeQuery.rows.length > 0) {
+      const employee = employeeQuery.rows[0];
+      if (employee.is_locked) {
+        const isExpired = employee.lock_until && new Date(employee.lock_until) <= new Date();
+        if (!isExpired) {
+          const remainingSeconds = employee.lock_until 
+            ? Math.ceil((new Date(employee.lock_until) - new Date()) / 1000)
+            : -1;
+          return res.status(423).json({
+            status: 'locked',
+            message: remainingSeconds === -1 
+              ? 'Account has been locked by an administrator.' 
+              : 'Account is temporarily locked due to excessive failed attempts.',
+            lockoutRemaining: remainingSeconds,
+          });
+        }
+      }
+    }
+
+    // 2. Check session status
     const sessionRes = await db.query(
       'SELECT status, expires_at FROM sessions WHERE id = $1 AND token_hash = $2',
       [decoded.sessionId, tokenHash]

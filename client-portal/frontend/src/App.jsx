@@ -86,6 +86,9 @@ function App() {
       if (err.response && err.response.status === 403 && err.response.data.status === 'mfa_required') {
         setSessionId(err.response.data.sessionId);
         setCurrentPage('otp');
+      } else if (err.response && err.response.status === 423) {
+        setLockoutRemaining(err.response.data.lockoutRemaining || 900);
+        setCurrentPage('locked');
       } else {
         // Try transparent refresh token rotation
         try {
@@ -101,9 +104,14 @@ function App() {
           setUser(retryResponse.data.user);
           setCurrentPage('dashboard');
         } catch (refreshErr) {
-          localStorage.removeItem('warden_token');
-          setToken('');
-          setCurrentPage('login');
+          if (refreshErr.response && refreshErr.response.status === 423) {
+            setLockoutRemaining(refreshErr.response.data.lockoutRemaining || 900);
+            setCurrentPage('locked');
+          } else {
+            localStorage.removeItem('warden_token');
+            setToken('');
+            setCurrentPage('login');
+          }
         }
       }
     }
