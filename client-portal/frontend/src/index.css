@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#F4F7FB] text-charcoal font-sans antialiased;
+  }
+}
+
+/* Custom premium scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 77, 140, 0.02);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(26, 127, 191, 0.4);
+  border-radius: 99px;
+}
+
+/* =========================================================================
+   Warden Glass Design Tokens & Utilities
+   ========================================================================= */
+
+/* Glass card styling */
+.card-warden {
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(10, 77, 140, 0.06), 0 4px 16px rgba(10, 77, 140, 0.04);
+  transition: box-shadow 200ms cubic-bezier(0.34, 1.56, 0.64, 1), transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.card-warden-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(10, 77, 140, 0.10), 0 8px 32px rgba(10, 77, 140, 0.07);
+}
+
+/* Damped oscillation shake animation */
+.animate-shake {
+  animation: shake 400ms ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+
+/* Page transitions fade-through */
+.page-transition-exit {
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+}
+
+.page-transition-enter {
+  opacity: 0;
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transition: opacity 200ms ease-in-out;
+}
+

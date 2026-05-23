@@ -1,0 +1,294 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#F4F7FB] text-charcoal font-sans antialiased select-none;
+  }
+  
+  /* Import Sora and DM Sans if not loaded */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Sora', sans-serif;
+  }
+}
+
+/* Custom premium scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 77, 140, 0.02);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(26, 127, 191, 0.4);
+  border-radius: 99px;
+  transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(10, 77, 140, 0.8);
+}
+
+/* =========================================================================
+   Warden Glass Design Tokens & Utilities
+   ========================================================================= */
+
+/* Glass card styling */
+.card-warden {
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(10, 77, 140, 0.06), 0 4px 16px rgba(10, 77, 140, 0.04);
+  transition: box-shadow 200ms cubic-bezier(0.34, 1.56, 0.64, 1), transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.card-warden-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(10, 77, 140, 0.10), 0 8px 32px rgba(10, 77, 140, 0.07);
+}
+
+/* Active navigation item pill */
+.nav-active-pill {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+}
+
+.nav-inactive {
+  color: rgba(255, 255, 255, 0.55);
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.nav-inactive:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Header bar frosted glass */
+.header-glass {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(10, 77, 140, 0.08);
+}
+
+/* Typography styles */
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Color Accent System (Badge washes) */
+.badge-glass-critical {
+  background: rgba(217, 48, 37, 0.08);
+  color: #B91C1C;
+  border: 1px solid rgba(217, 48, 37, 0.2);
+}
+
+.badge-glass-warning {
+  background: rgba(245, 166, 35, 0.10);
+  color: #92400E;
+  border: 1px solid rgba(245, 166, 35, 0.2);
+}
+
+.badge-glass-medium {
+  background: rgba(26, 127, 191, 0.08);
+  color: #1A7FBF;
+  border: 1px solid rgba(26, 127, 191, 0.2);
+}
+
+.badge-glass-low {
+  background: rgba(46, 158, 107, 0.08);
+  color: #2E9E6B;
+  border: 1px solid rgba(46, 158, 107, 0.2);
+}
+
+.badge-glass-success {
+  background: rgba(46, 158, 107, 0.08);
+  color: #2E9E6B;
+  border: 1px solid rgba(46, 158, 107, 0.2);
+}
+
+/* Glowing Blue Pulse Indicator */
+.pulse-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: #1A7FBF;
+  position: relative;
+  display: inline-block;
+}
+
+.pulse-indicator::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 99px;
+  background: #1A7FBF;
+  animation: pulse-ring 1.8s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* Live Alert Feed Horizontal Arrival Line */
+.live-progress-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: #1A7FBF;
+  animation: feed-flash 600ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes feed-flash {
+  0% {
+    width: 0%;
+    opacity: 1;
+  }
+  50% {
+    width: 100%;
+    opacity: 1;
+  }
+  100% {
+    width: 100%;
+    opacity: 0;
+  }
+}
+
+/* Alert Row slide in animation */
+.alert-row-appear {
+  animation: alert-slide-in 280ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes alert-slide-in {
+  0% {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Skeleton Screens Shimmer Loading State */
+.shimmer-bg {
+  background: linear-gradient(90deg, #F0F4F8 25%, #E4EBF5 50%, #F0F4F8 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+/* Page transition classes */
+.page-exit {
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+}
+
+.page-enter {
+  opacity: 1;
+  transition: opacity 200ms ease-in-out;
+}
+
+/* Diagonal line texture for sidebar */
+.sidebar-texture {
+  background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40' fill='none' stroke='%23ffffff' stroke-width='1.5' stroke-opacity='0.02'/%3E%3C/svg%3E");
+}
+
+/* Centered illustration pulse breathing animation */
+.empty-state-shield {
+  animation: shield-breath 3s ease-in-out infinite;
+}
+
+@keyframes shield-breath {
+  0%, 100% {
+    transform: scale(1.0);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+/* Damped oscillation shake animation */
+.animate-shake {
+  animation: shake 400ms ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+
+/* Flip roll animation for rolling counters */
+.counter-roll-up {
+  animation: flip-up 400ms cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes flip-up {
+  0% {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Premium spring modal transitions */
+.modal-overlay {
+  background: rgba(7, 31, 60, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: opacity 220ms ease-in-out;
+}
+
+.modal-card-enter {
+  animation: modal-spring-enter 220ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.modal-card-exit {
+  animation: modal-spring-exit 150ms ease-in-out forwards;
+}
+
+@keyframes modal-spring-enter {
+  0% {
+    transform: scale(0.94);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes modal-spring-exit {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+}
+
+
