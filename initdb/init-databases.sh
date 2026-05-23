@@ -27,7 +27,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "warden_client_acme
         ip_address VARCHAR(45) NOT NULL,
         status VARCHAR(20) DEFAULT 'active',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        refresh_token_hash VARCHAR(255) NULL,
+        refresh_expires_at TIMESTAMP WITH TIME ZONE NULL
     );
     CREATE TABLE login_attempts (
         id SERIAL PRIMARY KEY,
@@ -68,7 +70,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "warden_client_glob
         ip_address VARCHAR(45) NOT NULL,
         status VARCHAR(20) DEFAULT 'active',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        refresh_token_hash VARCHAR(255) NULL,
+        refresh_expires_at TIMESTAMP WITH TIME ZONE NULL
     );
     CREATE TABLE login_attempts (
         id SERIAL PRIMARY KEY,
