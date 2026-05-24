@@ -9,6 +9,7 @@ const { rateLimit } = require('express-rate-limit');
 const db = require('./config/db');
 const { initSocket } = require('./services/socket');
 const { computeBehaviorBaselines } = require('./engine/baselineJob');
+const { startPolling } = require('./services/telemetryPoller');
 
 const ingestRouter = require('./routes/ingest');
 const authRouter = require('./routes/auth');
@@ -128,4 +129,5 @@ async function seedCentralSystem() {
 server.listen(PORT, async () => {
   console.log(`Warden Central Backend running on port ${PORT}`);
   await seedCentralSystem();
+  startPolling();
 });

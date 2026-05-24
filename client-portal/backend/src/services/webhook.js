@@ -1,5 +1,5 @@
 const geoip = require('geoip-lite');
-require('dotenv').config();
+const db = require('../config/db');
 
 function sendLoginEventWebhook({
   employeeId,
@@ -40,43 +40,37 @@ function sendLoginEventWebhook({
         };
       }
 
-      const payload = {
-        employeeId: employeeId || null,
-        email,
-        companyId: process.env.TENANT_ID,
-        eventType,
-        timestamp: (deviceFingerprint && deviceFingerprint.mockTimestamp) || new Date().toISOString(),
-        ipAddress: checkIp,
-        userAgent: userAgent || 'Unknown',
-        deviceFingerprint: {
-          browser: (deviceFingerprint && deviceFingerprint.browser) || 'Unknown',
-          os: (deviceFingerprint && deviceFingerprint.os) || 'Unknown',
-          deviceType: (deviceFingerprint && deviceFingerprint.deviceType) || 'Desktop',
-          timezone: (deviceFingerprint && deviceFingerprint.timezone) || 'UTC',
-          language: (deviceFingerprint && deviceFingerprint.language) || 'en',
-          fingerprintHash: (deviceFingerprint && deviceFingerprint.fingerprintHash) || 'unknown-hash',
-        },
-        geolocation: geo,
+      const fingerprint = {
+        browser: (deviceFingerprint && deviceFingerprint.browser) || 'Unknown',
+        os: (deviceFingerprint && deviceFingerprint.os) || 'Unknown',
+        deviceType: (deviceFingerprint && deviceFingerprint.deviceType) || 'Desktop',
+        timezone: (deviceFingerprint && deviceFingerprint.timezone) || 'UTC',
+        language: (deviceFingerprint && deviceFingerprint.language) || 'en',
+        fingerprintHash: (deviceFingerprint && deviceFingerprint.fingerprintHash) || 'unknown-hash',
+        mockTimestamp: (deviceFingerprint && deviceFingerprint.mockTimestamp) || null,
       };
 
-      console.log(`Sending webhook event to Central: ${eventType} for ${email}`);
+      const timestamp = (deviceFingerprint && deviceFingerprint.mockTimestamp) || new Date().toISOString();
 
-      const response = await fetch(process.env.CENTRAL_WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.CENTRAL_API_KEY,
-        },
-        body: JSON.stringify(payload),
-      });
+      console.log(`[TELEMETRY] Buffering event locally: ${eventType} for ${email}`);
 
-      if (!response.ok) {
-        console.error(`Central Ingest failed with status: ${response.status}`);
-      } else {
-        console.log(`Central Ingest successful for: ${email}`);
-      }
+      // Insert event into local database table telemetry_events
+      await db.query(
+        `INSERT INTO telemetry_events (employee_id, email, event_type, ip_address, user_agent, device_fingerprint, geolocation, timestamp) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          employeeId || null,
+          email,
+          eventType,
+          checkIp,
+          userAgent || 'Unknown',
+          JSON.stringify(fingerprint),
+          JSON.stringify(geo),
+          timestamp
+        ]
+      );
     } catch (error) {
-      console.error('Failed to send webhook to Central:', error.message);
+      console.error('[TELEMETRY ERROR] Failed to buffer event:', error.message);
     }
   });
 }

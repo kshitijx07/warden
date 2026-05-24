@@ -256,6 +256,74 @@ function verifyCallbackSignature(req, res, next) {
   next();
 }
 
+// Middleware to verify GET requests using header signature
+function verifyGetCallbackSignature(req, res, next) {
+  const signature = req.headers['x-warden-signature'];
+  const payloadStr = req.headers['x-warden-payload'];
+  if (!signature || !payloadStr) {
+    return res.status(401).json({ message: 'Missing signature or payload headers' });
+  }
+
+  const computedSignature = crypto
+    .createHmac('sha256', process.env.CENTRAL_API_KEY)
+    .update(payloadStr)
+    .digest('hex');
+
+  if (computedSignature !== signature) {
+    console.error(`[HMAC ERROR] GET Signature validation failed!`);
+    return res.status(401).json({ message: 'Invalid GET callback HMAC signature' });
+  }
+
+  try {
+    const payload = JSON.parse(payloadStr);
+    const timeDiff = Math.abs(new Date() - new Date(payload.timestamp));
+    if (timeDiff > 5 * 60 * 1000) {
+      return res.status(401).json({ message: 'Callback request expired (anti-replay check failed)' });
+    }
+    req.callbackPayload = payload;
+  } catch (err) {
+    return res.status(400).json({ message: 'Invalid payload JSON structure' });
+  }
+  next();
+}
+
+// 3.8 Admin Callback: Telemetry Event Stream (Pull)
+router.get('/callback/telemetry', verifyGetCallbackSignature, async (req, res) => {
+  const incomingApiKey = req.headers['x-api-key'];
+  if (incomingApiKey !== process.env.CENTRAL_API_KEY) {
+    return res.status(401).json({ message: 'Unauthorized API Key' });
+  }
+
+  const lastId = parseInt(req.query.lastId || '0', 10);
+
+  try {
+    const eventsRes = await db.query(
+      `SELECT * FROM telemetry_events 
+       WHERE id > $1 
+       ORDER BY id ASC LIMIT 100`,
+      [lastId]
+    );
+
+    const formattedEvents = eventsRes.rows.map(row => ({
+      id: row.id,
+      employeeId: row.employee_id,
+      email: row.email,
+      companyId: process.env.TENANT_ID,
+      eventType: row.event_type,
+      timestamp: row.timestamp,
+      ipAddress: row.ip_address,
+      userAgent: row.user_agent,
+      deviceFingerprint: row.device_fingerprint,
+      geolocation: row.geolocation,
+    }));
+
+    return res.status(200).json({ events: formattedEvents });
+  } catch (error) {
+    console.error('Fetch telemetry callback error:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // 3. Admin Callback: Challenge MFA
 router.post('/callback/challenge-mfa', verifyCallbackSignature, async (req, res) => {
   const incomingApiKey = req.headers['x-api-key'];
